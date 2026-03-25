@@ -9,6 +9,10 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Reverted to the raw appId. The permission error was caused by the filename containing "src/",
+// which unknowingly injected a "/" into the App ID. This fundamentally broke the 
+// database path counting and caused the security rules to deny permission.
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- HELPER FUNCTIONS ---
@@ -74,24 +78,33 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    // RULE 1: Using the specific path required for collaborative/public data
-    const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'machines');
-    const q = query(collectionPath);
+    let unsubscribe;
+    try {
+      // RULE 1: Using the specific path required for collaborative/public data
+      const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'machines');
+      const q = query(collectionPath);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const machinesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setMachines(machinesData);
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        const machinesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setMachines(machinesData);
+        setLoading(false);
+      }, (err) => {
+        console.error("Firestore Error:", err);
+        setError("Failed to load machine data.");
+        setLoading(false);
+      });
+    } catch (err) {
+      console.error("Error setting up Firestore:", err);
+      setError("Failed to initialize database connection.");
       setLoading(false);
-    }, (err) => {
-      console.error("Firestore Error:", err);
-      setError("Failed to load machine data.");
-      setLoading(false);
-    });
+    }
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [user]);
 
   // Process data to find upcoming birthdays
