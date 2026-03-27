@@ -5,16 +5,15 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query, setDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "", 
-      authDomain: "machine-birthday-crm.firebaseapp.com",
-      projectId: "machine-birthday-crm",
-      storageBucket: "machine-birthday-crm.firebasestorage.app",
-      messagingSenderId: "",
-      appId: ""
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyCYUHfKcsOZDu8nBwRbtUyEYTsVZns052I",
+  authDomain: "machine-birthday-crm.firebaseapp.com",
+  projectId: "machine-birthday-crm",
+  storageBucket: "machine-birthday-crm.firebasestorage.app",
+  messagingSenderId: "696470180088",
+  appId: "1:696470180088:web:5b49d4507dd9883efd6b0d",
+  measurementId: "G-4ZSN67XMQH"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
