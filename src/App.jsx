@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Mail, Calendar, Settings, CheckCircle, Clock, Users, Plus, X, Download, MapPin, Edit2, Trash2, AlertTriangle, Loader2, Info, Building2, Menu, MessageSquare, Send, ChevronRight } from 'lucide-react';
+import { Mail, Calendar, Settings, CheckCircle, Clock, Users, Plus, X, Download, MapPin, Edit2, Trash2, AlertTriangle, Loader2, Info, Building2, Menu, MessageSquare, Send, ChevronRight, FastForward, RotateCcw } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query, setDoc } from 'firebase/firestore';
@@ -19,7 +19,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// FIX: Auto-healing appId for Preview vs Live consistency
 const getAppId = () => {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -46,7 +45,7 @@ const MachineBirthdayLogo = ({ className, colorized = false, showText = false })
     </svg>
     {showText && (
       <div className="flex flex-col leading-none">
-        <span className="text-xl font-black tracking-tighter uppercase italic text-white md:text-white">Machine</span>
+        <span className="text-xl font-black tracking-tighter uppercase italic text-white">Machine</span>
         <span className="text-xl font-black tracking-tighter uppercase italic text-pink-500">Birthday</span>
       </div>
     )}
@@ -54,14 +53,16 @@ const MachineBirthdayLogo = ({ className, colorized = false, showText = false })
 );
 
 // --- HELPER FUNCTIONS ---
-const calculateMachineAge = (purchaseDate, lifespanYears) => {
+// Updated to accept a "referenceDate" for demo purposes
+const calculateMachineAge = (purchaseDate, lifespanYears, referenceDate = new Date()) => {
   if (!purchaseDate) return { humanEquivalentYears: 0, stage: "Newborn" };
   let purchase = purchaseDate && typeof purchaseDate.toDate === 'function' ? purchaseDate.toDate() : new Date(purchaseDate);
-  const now = new Date();
   if (isNaN(purchase.getTime())) return { humanEquivalentYears: 0, stage: "Newborn" };
-  const monthsPassed = (now.getFullYear() - purchase.getFullYear()) * 12 + (now.getMonth() - purchase.getMonth());
+  
+  const monthsPassed = (referenceDate.getFullYear() - purchase.getFullYear()) * 12 + (referenceDate.getMonth() - purchase.getMonth());
   const totalLifespanMonths = (Number(lifespanYears) || 5) * 12;
   const humanEquivalentYears = Math.round((monthsPassed / totalLifespanMonths) * 80);
+  
   let stage = "Newborn";
   if (humanEquivalentYears >= 74) stage = "Retiring";
   else if (humanEquivalentYears >= 64) stage = "Golden Years";
@@ -86,7 +87,6 @@ const FAQ_DATA = {
     options: [
       { label: "How does the 'Birthday' logic work?", next: "logic" },
       { label: "How do I add a new machine?", next: "add" },
-      { label: "How do I export mailing labels?", next: "export" },
       { label: "Can SpearPoint handle fulfillment?", next: "fulfillment" },
       { label: "I need technical support.", next: "contact" }
     ]
@@ -97,10 +97,6 @@ const FAQ_DATA = {
   },
   "add": {
     text: "Click the big indigo 'Add Machine' button in the header. Fill in the customer name, purchase date, and address. Once saved, the machine automatically begins its lifecycle tracking.",
-    options: [{ label: "Back to main menu", next: "initial" }]
-  },
-  "export": {
-    text: "When machines are due for a card, they appear in 'Requires Action'. Click 'Export Labels' to download a CSV file ready for your printer or mail house.",
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "fulfillment": {
@@ -126,6 +122,10 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [subscriberLogo, setSubscriberLogo] = useState('');
   
+  // DEMO MODE STATE
+  const [systemDate, setSystemDate] = useState(new Date());
+
+  // Chatbot State
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([FAQ_DATA.initial]);
   const chatEndRef = useRef(null);
@@ -143,10 +143,7 @@ export default function App() {
         } else {
           await signInAnonymously(auth);
         }
-      } catch (err) { 
-        setStatusMsg("Auth error."); 
-        setLoading(false); 
-      }
+      } catch (err) { setStatusMsg("Auth error."); setLoading(false); }
     };
     initAuth();
     return onAuthStateChanged(auth, setUser);
@@ -158,17 +155,11 @@ export default function App() {
     const unsubMachines = onSnapshot(machinesRef, (snapshot) => {
       setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
-    }, (err) => {
-      console.error("Firestore Error:", err);
-      setStatusMsg("Permission Denied.");
-      setLoading(false);
     });
-
     const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) setSubscriberLogo(docSnap.data().logoUrl || '');
     });
-
     return () => { unsubMachines(); unsubSettings(); };
   }, [user]);
 
@@ -179,7 +170,8 @@ export default function App() {
   const dashboardData = useMemo(() => {
     let toSend = []; let completed = [];
     machines.forEach(m => {
-      const ageData = calculateMachineAge(m.purchaseDate, m.lifespanYears);
+      const ageData = calculateMachineAge(m.purchaseDate, m.lifespanYears, systemDate);
+      // Check if machine is past Newborn stage and needs a card for its CURRENT stage
       if (ageData.stage !== "Newborn" && m.lastCardSent !== ageData.stage) toSend.push({ ...m, ...ageData });
       else completed.push({ ...m, ...ageData });
     });
@@ -187,7 +179,15 @@ export default function App() {
       toSend: toSend.sort((a,b) => b.humanEquivalentYears - a.humanEquivalentYears), 
       completed: completed.sort((a,b) => b.humanEquivalentYears - a.humanEquivalentYears)
     };
-  }, [machines]);
+  }, [machines, systemDate]);
+
+  const advanceTime = (months) => {
+    const newDate = new Date(systemDate);
+    newDate.setMonth(newDate.getMonth() + months);
+    setSystemDate(newDate);
+  };
+
+  const resetTime = () => setSystemDate(new Date());
 
   const handleChatOption = (nextKey) => {
     const nextStep = FAQ_DATA[nextKey];
@@ -231,7 +231,7 @@ export default function App() {
   };
 
   const handleExportCSV = () => {
-    if (dashboardData.toSend.length === 0) return alert("No cards due.");
+    if (dashboardData.toSend.length === 0) return alert("No cards currently due for export.");
     const headers = ["Customer", "Contact", "Address", "City", "State", "Zip", "Machine", "Stage", "Human Years"];
     const csvRows = [headers.join(",")];
     dashboardData.toSend.forEach(item => {
@@ -253,16 +253,24 @@ export default function App() {
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Users size={18}/> Customers</div><span>Soon</span></div>
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Calendar size={18}/> Calendar</div><span>Soon</span></div>
       </nav>
+
+      {/* DEMO CONTROLS SECTION */}
+      <div className="bg-indigo-900/40 p-5 rounded-3xl border border-white/5 mb-6">
+        <p className="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-3 flex items-center gap-2"><FastForward size={12}/> Demo Time Travel</p>
+        <div className="space-y-2">
+          <button onClick={() => advanceTime(1)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase tracking-tighter text-indigo-200 transition-all text-left flex justify-between items-center">Advance 1 Month <ChevronRight size={12}/></button>
+          <button onClick={() => advanceTime(6)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase tracking-tighter text-indigo-200 transition-all text-left flex justify-between items-center">Advance 6 Months <ChevronRight size={12}/></button>
+          <button onClick={resetTime} className="w-full text-[9px] font-black uppercase text-indigo-400/60 mt-2 flex items-center justify-center gap-2 hover:text-indigo-400 transition-colors"><RotateCcw size={10}/> Reset to Today</button>
+        </div>
+      </div>
+
       <div className="pt-6 border-t border-white/10 mt-auto">
         <div className="mb-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 mb-2">Service Fleet</p>
           <p className="font-black text-indigo-400 tracking-tighter uppercase italic text-xs truncate">{appId.replace(/_/g, ' ')}</p>
         </div>
         <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="flex items-center gap-3 text-white/60 hover:text-white transition-colors text-sm font-bold w-full text-left mb-6"><Settings size={18}/> Branding</button>
-        <div className="pt-4 border-t border-white/5 opacity-50">
-          <p className="text-[9px] font-medium tracking-widest text-white/40 uppercase mb-1">Developed by</p>
-          <p className="text-[10px] font-black text-white/60 tracking-tight uppercase">SpearPoint Solutions</p>
-        </div>
+        <div className="pt-4 border-t border-white/5 opacity-50"><p className="text-[9px] font-medium tracking-widest text-white/40 uppercase mb-1">Developed by</p><p className="text-[10px] font-black text-white/60 tracking-tight uppercase">SpearPoint Solutions</p></div>
       </div>
     </>
   );
@@ -304,7 +312,13 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 p-4 md:p-10 overflow-auto z-10 relative pb-24 md:pb-10 flex flex-col min-h-screen">
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
-          <div><h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 uppercase italic leading-none">Mail Queue</h1><p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2 md:mt-3">Tracking {machines.length} Units</p></div>
+          <div>
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 uppercase italic leading-none">Mail Queue</h1>
+            <div className="flex items-center gap-3 mt-3">
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-r border-slate-300 pr-3">Fleet Size: {machines.length}</p>
+              <p className="text-[10px] font-black uppercase text-indigo-500 flex items-center gap-1"><Clock size={12}/> System Date: {systemDate.toLocaleDateString()}</p>
+            </div>
+          </div>
           <div className="flex flex-row w-full lg:w-auto gap-3">
             <button onClick={handleExportCSV} className="flex-1 lg:flex-none bg-white border-2 border-slate-200 px-6 py-4 md:py-3 rounded-2xl font-black shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] md:text-xs text-slate-600"><Download size={18} /> Export Labels</button>
             <button onClick={() => { setEditingId(null); setFormData({customer:'', contact:'', machine:'', purchaseDate:'', lifespanYears:5, address:'', city:'', state:'', zip:''}); setShowModal(true); }} className="flex-1 lg:flex-none bg-indigo-600 text-white px-6 py-4 md:py-3 rounded-2xl font-black shadow-xl hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] md:text-xs"><Plus size={18} /> Add Machine</button>
