@@ -81,6 +81,7 @@ const SafeVal = ({ value }) => {
 };
 
 // --- CHATBOT DATA ---
+// Updated text to use JSX for mailto links
 const FAQ_DATA = {
   "initial": {
     text: "Hi! I'm your Machine Birthday assistant. How can I help you today?",
@@ -105,11 +106,20 @@ const FAQ_DATA = {
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "fulfillment": {
-    text: "Yes! SpearPoint Solutions can handle the entire process of hand-writing the cards and mailing them out for you. Please contact us at support@SpearPointOnline.com for a custom quote inquiry.",
+    text: (
+      <span>
+        Yes! SpearPoint Solutions can handle the entire process of hand-writing the cards and mailing them out for you. 
+        Please contact us at <a href="mailto:support@SpearPointOnline.com" className="text-indigo-600 underline font-bold hover:text-indigo-800 transition-colors">support@SpearPointOnline.com</a> for a custom quote inquiry.
+      </span>
+    ),
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "contact": {
-    text: "You can reach the SpearPoint Solutions team at support@SpearPointOnline.com for technical support or for inquiries about creating a custom business strategy for your organization.",
+    text: (
+      <span>
+        You can reach the SpearPoint Solutions team at <a href="mailto:support@SpearPointOnline.com" className="text-indigo-600 underline font-bold hover:text-indigo-800 transition-colors">support@SpearPointOnline.com</a> for technical support or for inquiries about creating a custom business strategy for your organization.
+      </span>
+    ),
     options: [{ label: "Back to main menu", next: "initial" }]
   }
 };
@@ -127,6 +137,8 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [subscriberLogo, setSubscriberLogo] = useState('');
   const [systemDate, setSystemDate] = useState(new Date());
+  
+  // Chatbot State
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([FAQ_DATA.initial]);
   const chatEndRef = useRef(null);
@@ -282,11 +294,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900 selection:bg-indigo-100 relative overflow-hidden">
       
+      {/* MOBILE HEADER */}
       <div className="md:hidden flex items-center justify-between p-4 bg-indigo-950 text-white z-50">
         <MachineBirthdayLogo colorized showText className="scale-75 origin-left" />
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 bg-white/10 rounded-xl"><Menu size={24} /></button>
       </div>
 
+      {/* BACKGROUND WATERMARK */}
       <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center transition-all duration-1000">
         {subscriberLogo ? (
           <div className="w-full h-full opacity-[0.03]" style={{ backgroundImage: `url("${subscriberLogo}")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'center', backgroundSize: 'clamp(250px, 40vw, 600px)' }} />
@@ -362,7 +376,7 @@ export default function App() {
         </footer>
       </div>
 
-      {/* CHATBOT WIDGET (UPDATED: Removed Non-Functional Input Bar) */}
+      {/* CHATBOT WIDGET (UPDATED: Added live mailto links) */}
       <div className={`fixed bottom-6 right-6 z-[200] flex flex-col items-end transition-all duration-300 ${chatOpen ? 'w-[320px] md:w-[380px]' : 'w-14'}`}>
         {chatOpen && (
           <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 w-full mb-4 flex flex-col max-h-[450px] animate-in slide-in-from-bottom-5 overflow-hidden">
@@ -373,7 +387,9 @@ export default function App() {
             <div className="flex-1 overflow-auto p-6 space-y-4">
               {chatHistory.map((msg, i) => (
                 <div key={i} className={`flex flex-col ${msg.type === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${msg.type === 'user' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-50 text-slate-600 font-medium'}`}>{msg.text}</div>
+                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${msg.type === 'user' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-50 text-slate-600 font-medium'}`}>
+                    {msg.text}
+                  </div>
                   {msg.options && !chatHistory[i+1] && (
                     <div className="mt-3 flex flex-col gap-2 w-full">
                       {msg.options.map((opt, oi) => (
@@ -432,6 +448,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Delete Confirmation */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-[100] p-4 font-sans text-center">
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-sm shadow-2xl border border-white/10 animate-in fade-in duration-200">
