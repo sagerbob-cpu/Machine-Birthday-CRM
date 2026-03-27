@@ -19,6 +19,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// FIX: Auto-healing appId for Preview vs Live consistency
 const getAppId = () => {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -53,7 +54,6 @@ const MachineBirthdayLogo = ({ className, colorized = false, showText = false })
 );
 
 // --- HELPER FUNCTIONS ---
-// Updated to accept a "referenceDate" for demo purposes
 const calculateMachineAge = (purchaseDate, lifespanYears, referenceDate = new Date()) => {
   if (!purchaseDate) return { humanEquivalentYears: 0, stage: "Newborn" };
   let purchase = purchaseDate && typeof purchaseDate.toDate === 'function' ? purchaseDate.toDate() : new Date(purchaseDate);
@@ -87,6 +87,7 @@ const FAQ_DATA = {
     options: [
       { label: "How does the 'Birthday' logic work?", next: "logic" },
       { label: "How do I add a new machine?", next: "add" },
+      { label: "How do I export mailing labels?", next: "export" },
       { label: "Can SpearPoint handle fulfillment?", next: "fulfillment" },
       { label: "I need technical support.", next: "contact" }
     ]
@@ -97,6 +98,10 @@ const FAQ_DATA = {
   },
   "add": {
     text: "Click the big indigo 'Add Machine' button in the header. Fill in the customer name, purchase date, and address. Once saved, the machine automatically begins its lifecycle tracking.",
+    options: [{ label: "Back to main menu", next: "initial" }]
+  },
+  "export": {
+    text: "When machines are due for a card, they appear in 'Requires Action'. Click 'Export Labels' to download a CSV file ready for your printer or mail house.",
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "fulfillment": {
@@ -121,11 +126,7 @@ export default function App() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [subscriberLogo, setSubscriberLogo] = useState('');
-  
-  // DEMO MODE STATE
   const [systemDate, setSystemDate] = useState(new Date());
-
-  // Chatbot State
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([FAQ_DATA.initial]);
   const chatEndRef = useRef(null);
@@ -171,7 +172,6 @@ export default function App() {
     let toSend = []; let completed = [];
     machines.forEach(m => {
       const ageData = calculateMachineAge(m.purchaseDate, m.lifespanYears, systemDate);
-      // Check if machine is past Newborn stage and needs a card for its CURRENT stage
       if (ageData.stage !== "Newborn" && m.lastCardSent !== ageData.stage) toSend.push({ ...m, ...ageData });
       else completed.push({ ...m, ...ageData });
     });
@@ -186,8 +186,6 @@ export default function App() {
     newDate.setMonth(newDate.getMonth() + months);
     setSystemDate(newDate);
   };
-
-  const resetTime = () => setSystemDate(new Date());
 
   const handleChatOption = (nextKey) => {
     const nextStep = FAQ_DATA[nextKey];
@@ -254,13 +252,12 @@ export default function App() {
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Calendar size={18}/> Calendar</div><span>Soon</span></div>
       </nav>
 
-      {/* DEMO CONTROLS SECTION */}
       <div className="bg-indigo-900/40 p-5 rounded-3xl border border-white/5 mb-6">
-        <p className="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-3 flex items-center gap-2"><FastForward size={12}/> Demo Time Travel</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-3 flex items-center gap-2"><FastForward size={12}/> Demo Controls</p>
         <div className="space-y-2">
           <button onClick={() => advanceTime(1)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase tracking-tighter text-indigo-200 transition-all text-left flex justify-between items-center">Advance 1 Month <ChevronRight size={12}/></button>
           <button onClick={() => advanceTime(6)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase tracking-tighter text-indigo-200 transition-all text-left flex justify-between items-center">Advance 6 Months <ChevronRight size={12}/></button>
-          <button onClick={resetTime} className="w-full text-[9px] font-black uppercase text-indigo-400/60 mt-2 flex items-center justify-center gap-2 hover:text-indigo-400 transition-colors"><RotateCcw size={10}/> Reset to Today</button>
+          <button onClick={() => setSystemDate(new Date())} className="w-full text-[9px] font-black uppercase text-indigo-400/60 mt-2 flex items-center justify-center gap-2 hover:text-indigo-400 transition-colors"><RotateCcw size={10}/> Reset Time</button>
         </div>
       </div>
 
@@ -285,13 +282,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900 selection:bg-indigo-100 relative overflow-hidden">
       
-      {/* MOBILE HEADER */}
       <div className="md:hidden flex items-center justify-between p-4 bg-indigo-950 text-white z-50">
         <MachineBirthdayLogo colorized showText className="scale-75 origin-left" />
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 bg-white/10 rounded-xl"><Menu size={24} /></button>
       </div>
 
-      {/* BACKGROUND WATERMARK */}
       <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center transition-all duration-1000">
         {subscriberLogo ? (
           <div className="w-full h-full opacity-[0.03]" style={{ backgroundImage: `url("${subscriberLogo}")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'center', backgroundSize: 'clamp(250px, 40vw, 600px)' }} />
@@ -314,9 +309,12 @@ export default function App() {
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
           <div>
             <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 uppercase italic leading-none">Mail Queue</h1>
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex flex-wrap items-center gap-3 mt-3">
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-r border-slate-300 pr-3">Fleet Size: {machines.length}</p>
-              <p className="text-[10px] font-black uppercase text-indigo-500 flex items-center gap-1"><Clock size={12}/> System Date: {systemDate.toLocaleDateString()}</p>
+              <p className="text-[10px] font-black uppercase text-indigo-500 flex items-center gap-1"><Clock size={12}/> Date: {systemDate.toLocaleDateString()}</p>
+              {systemDate.toDateString() !== new Date().toDateString() && (
+                <span className="bg-pink-100 text-pink-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter">Demo Mode Active</span>
+              )}
             </div>
           </div>
           <div className="flex flex-row w-full lg:w-auto gap-3">
@@ -364,11 +362,11 @@ export default function App() {
         </footer>
       </div>
 
-      {/* CHATBOT WIDGET */}
-      <div className={`fixed bottom-6 right-6 z-[200] flex flex-col items-end transition-all duration-300 ${chatOpen ? 'w-[350px] md:w-[400px]' : 'w-14'}`}>
+      {/* CHATBOT WIDGET (UPDATED: Removed Non-Functional Input Bar) */}
+      <div className={`fixed bottom-6 right-6 z-[200] flex flex-col items-end transition-all duration-300 ${chatOpen ? 'w-[320px] md:w-[380px]' : 'w-14'}`}>
         {chatOpen && (
-          <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 w-full mb-4 flex flex-col h-[500px] animate-in slide-in-from-bottom-5">
-            <div className="bg-indigo-600 p-6 rounded-t-[2rem] flex justify-between items-center text-white">
+          <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 w-full mb-4 flex flex-col max-h-[450px] animate-in slide-in-from-bottom-5 overflow-hidden">
+            <div className="bg-indigo-600 p-6 rounded-t-[2rem] flex justify-between items-center text-white shrink-0">
               <div className="flex items-center gap-3 font-bold uppercase tracking-widest text-xs"><div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]"></div>Assistant</div>
               <button onClick={() => setChatOpen(false)} className="bg-white/10 p-2 rounded-xl hover:bg-white/20 transition-colors"><X size={18}/></button>
             </div>
@@ -388,10 +386,6 @@ export default function App() {
                 </div>
               ))}
               <div ref={chatEndRef} />
-            </div>
-            <div className="p-4 border-t bg-slate-50 rounded-b-[2rem] flex items-center gap-3">
-              <input disabled placeholder="Ask a question..." className="flex-1 bg-white border border-slate-200 px-4 py-3 rounded-xl text-xs outline-none opacity-50 cursor-not-allowed" />
-              <button disabled className="bg-indigo-400 text-white p-3 rounded-xl"><Send size={18}/></button>
             </div>
           </div>
         )}
@@ -438,7 +432,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Delete Confirmation */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-[100] p-4 font-sans text-center">
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-sm shadow-2xl border border-white/10 animate-in fade-in duration-200">
