@@ -101,7 +101,7 @@ const FAQ_DATA = {
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "contact": {
-    text: "You can reach Bob Sager and the SpearPoint Solutions team at SpearPointOnline.com for technical support or business strategy.",
+    text: "You can reach the SpearPoint Solutions team at support@SpearPointOnline.com for technical support or for inquiries about creating a custom business strategy for your organization.",
     options: [{ label: "Back to main menu", next: "initial" }]
   }
 };
@@ -150,10 +150,16 @@ export default function App() {
     const unsubMachines = onSnapshot(machinesRef, (snapshot) => {
       setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
+    }, (err) => {
+      setStatusMsg("Permission Denied.");
+      setLoading(false);
     });
+
     const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) setSubscriberLogo(docSnap.data().logoUrl || '');
+    }, (err) => {
+      console.warn("Branding restricted.");
     });
     return () => { unsubMachines(); unsubSettings(); };
   }, [user]);
@@ -214,7 +220,7 @@ export default function App() {
   };
 
   const handleExportCSV = () => {
-    if (dashboardData.toSend.length === 0) return alert("No cards due.");
+    if (dashboardData.toSend.length === 0) return alert("No cards currently due for export.");
     const headers = ["Customer", "Contact", "Address", "City", "State", "Zip", "Machine", "Stage", "Human Years"];
     const csvRows = [headers.join(",")];
     dashboardData.toSend.forEach(item => {
@@ -268,7 +274,7 @@ export default function App() {
         )}
       </div>
 
-      <div className="hidden md:flex w-64 bg-indigo-950 text-white p-6 flex-col shadow-2xl z-20"><SidebarContent /></div>
+      <div className="hidden md:flex w-64 bg-indigo-950 text-white p-6 flex flex-col shadow-2xl z-20"><SidebarContent /></div>
 
       {mobileMenuOpen && (
         <div className="fixed inset-0 bg-indigo-950 z-[60] p-6 flex flex-col">
@@ -293,7 +299,7 @@ export default function App() {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/50 text-[11px] font-bold uppercase tracking-widest text-slate-400 border-b"><tr><th className="p-6">Customer / Address</th><th className="p-6">Machine Details</th><th className="p-6 text-center">Life Stage</th><th className="p-6 text-right">Action</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {dashboardData.toSend.length === 0 ? ( <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-bold italic text-lg uppercase opacity-50">Queue Empty</td></tr> ) : (
+              {dashboardData.toSend.length === 0 ? ( <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-bold italic text-lg uppercase opacity-50 underline decoration-slate-100">No birthdays due today</td></tr> ) : (
                 dashboardData.toSend.map(item => (
                   <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
                     <td className="p-6"><div className="flex items-center gap-3 mb-1"><p className="font-bold text-slate-900 text-lg leading-none truncate max-w-[250px]"><SafeVal value={item.customer} /></p><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-2 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Edit2 size={14}/></button><button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-2 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Trash2 size={14}/></button></div></div><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><MapPin size={10} className="text-indigo-400" /> <SafeVal value={item.address} />, <SafeVal value={item.city} /> <SafeVal value={item.state} /></p></td>
