@@ -150,16 +150,10 @@ export default function App() {
     const unsubMachines = onSnapshot(machinesRef, (snapshot) => {
       setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
-    }, (err) => {
-      setStatusMsg("Permission Denied.");
-      setLoading(false);
     });
-
     const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) setSubscriberLogo(docSnap.data().logoUrl || '');
-    }, (err) => {
-      console.warn("Branding restricted.");
     });
     return () => { unsubMachines(); unsubSettings(); };
   }, [user]);
@@ -220,7 +214,7 @@ export default function App() {
   };
 
   const handleExportCSV = () => {
-    if (dashboardData.toSend.length === 0) return alert("No cards currently due for export.");
+    if (dashboardData.toSend.length === 0) return alert("No cards due.");
     const headers = ["Customer", "Contact", "Address", "City", "State", "Zip", "Machine", "Stage", "Human Years"];
     const csvRows = [headers.join(",")];
     dashboardData.toSend.forEach(item => {
@@ -242,9 +236,19 @@ export default function App() {
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest"><div className="flex items-center gap-3"><Users size={18}/> Customers</div><span>Soon</span></div>
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest"><div className="flex items-center gap-3"><Calendar size={18}/> Calendar</div><span>Soon</span></div>
       </nav>
-      <div className="pt-6 border-t border-white/10 mt-auto text-[10px] font-bold uppercase tracking-widest text-white/40">
-        <p className="mb-2 font-black text-indigo-400 tracking-tighter uppercase italic">{appId.replace(/_/g, ' ')} Fleet</p>
-        <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="flex items-center gap-3 text-white/60 hover:text-white transition-colors text-sm font-bold w-full text-left"><Settings size={18}/> Branding</button>
+      <div className="pt-6 border-t border-white/10 mt-auto">
+        <div className="mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 mb-2">Service Fleet</p>
+          <p className="font-black text-indigo-400 tracking-tighter uppercase italic text-xs">{appId.replace(/_/g, ' ')}</p>
+        </div>
+        
+        <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="flex items-center gap-3 text-white/60 hover:text-white transition-colors text-sm font-bold w-full text-left mb-6"><Settings size={18}/> Branding</button>
+        
+        {/* SIDEBAR DEVELOPER CREDIT */}
+        <div className="pt-4 border-t border-white/5 opacity-50">
+          <p className="text-[9px] font-medium tracking-widest text-white/40 uppercase mb-1">Developed by</p>
+          <p className="text-[10px] font-black text-white/60 tracking-tight uppercase">SpearPoint Solutions</p>
+        </div>
       </div>
     </>
   );
@@ -284,7 +288,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 p-4 md:p-10 overflow-auto z-10 relative pb-24 md:pb-10">
+      <div className="flex-1 p-4 md:p-10 overflow-auto z-10 relative pb-24 md:pb-10 flex flex-col min-h-screen">
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
           <div><h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 uppercase italic leading-none">Mail Queue</h1><p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2 md:mt-3">Tracking {machines.length} Units</p></div>
           <div className="flex flex-row w-full lg:w-auto gap-3">
@@ -326,6 +330,11 @@ export default function App() {
         <div className="flex items-center gap-3 mb-4 md:mb-6"><div className="bg-emerald-500 w-2 h-6 md:w-3 md:h-8 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.3)]"></div><h2 className="text-xl md:text-2xl font-bold uppercase tracking-tighter text-slate-800 italic">Up To Date ({dashboardData.completed.length})</h2></div>
         <div className="hidden md:block bg-white/60 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden opacity-95 mb-10"><table className="w-full text-left border-collapse"><thead className="bg-slate-50/50 text-[11px] font-bold uppercase tracking-widest text-slate-400 border-b"><tr><th className="p-6 text-left">Customer</th><th className="p-6 text-left">Machine</th><th className="p-6 text-center">Status</th><th className="p-6 text-right">Next Stage</th></tr></thead><tbody className="divide-y divide-slate-50">{dashboardData.completed.map(item => (<tr key={item.id} className="hover:bg-slate-50/30 transition-colors group"><td className="p-6"><div className="flex items-center gap-3"><p className="font-bold text-slate-700 leading-tight"><SafeVal value={item.customer} /></p><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-1.5"><Edit2 size={12}/></button><button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-1.5"><Trash2 size={12}/></button></div></div></td><td className="p-6 text-xs text-slate-500 font-bold uppercase tracking-widest"><SafeVal value={item.machine} /></td><td className="p-6 flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-emerald-600 tracking-widest"><CheckCircle size={14} className="text-emerald-500" /> {item.stage === "Newborn" ? "Growing Up" : "Card Sent"}</td><td className="p-6 text-[10px] font-bold uppercase text-slate-300 tracking-widest leading-tight text-right uppercase">{item.stage === "Newborn" ? "Toddler (Age 2)" : "Next Milestone"}</td></tr>))}</tbody></table></div>
         <div className="md:hidden space-y-3">{dashboardData.completed.map(item => (<div key={item.id} className="bg-white/70 p-5 rounded-3xl border border-slate-100 flex justify-between items-center"><div><p className="font-bold text-slate-700 text-sm">{item.customer}</p><p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.1em]">{item.machine}</p></div><div className="flex items-center gap-2 text-[9px] font-black uppercase text-emerald-500 bg-emerald-50 px-3 py-1.5 rounded-full"><CheckCircle size={10}/> {item.stage === "Newborn" ? "New" : "Sent"}</div></div>))}</div>
+
+        {/* MAIN CONTENT DASHBOARD FOOTER */}
+        <footer className="mt-auto py-10 text-center border-t border-slate-200/50">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em]">Developed by SpearPoint Solutions</p>
+        </footer>
       </div>
 
       {/* CHATBOT WIDGET */}
