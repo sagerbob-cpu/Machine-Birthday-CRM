@@ -19,7 +19,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Ensures a clean appId for consistent paths between Preview and Production
 const getAppId = () => {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -131,10 +130,8 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [subscriberLogo, setSubscriberLogo] = useState('');
   
-  // Demo Mode State
   const [systemDate, setSystemDate] = useState(new Date());
   
-  // Chatbot State
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([FAQ_DATA.initial]);
   const chatEndRef = useRef(null);
@@ -152,7 +149,7 @@ export default function App() {
         } else {
           await signInAnonymously(auth);
         }
-      } catch (err) { setStatusMsg("Connection error."); setLoading(false); }
+      } catch (err) { setStatusMsg("Auth Error."); setLoading(false); }
     };
     initAuth();
     return onAuthStateChanged(auth, setUser);
@@ -248,12 +245,11 @@ export default function App() {
     <>
       <div className="mb-12 hidden md:block"><MachineBirthdayLogo colorized showText /></div>
       <nav className="flex-1 space-y-3">
-        <button className="w-full flex items-center gap-3 bg-indigo-800/60 p-4 rounded-2xl font-bold shadow-lg border border-white/5 uppercase tracking-widest text-[10px] text-white"><Mail size={18}/> Mail Queue</button>
+        <button className="w-full flex items-center gap-3 bg-indigo-800/60 p-4 rounded-2xl font-bold transition-all shadow-lg border border-white/5 uppercase tracking-widest text-[10px] text-white"><Mail size={18}/> Mail Queue</button>
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Users size={18}/> Customers</div><span>Soon</span></div>
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Calendar size={18}/> Calendar</div><span>Soon</span></div>
       </nav>
 
-      {/* DEMO CONTROLS (REMOVE FOR PRODUCTION) */}
       <div className="bg-indigo-900/40 p-5 rounded-3xl border border-white/5 mb-6">
         <p className="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-3 flex items-center gap-2"><FastForward size={12}/> Demo Controls</p>
         <div className="space-y-2">
@@ -284,13 +280,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900 selection:bg-indigo-100 relative overflow-hidden">
       
-      {/* MOBILE HEADER */}
       <div className="md:hidden flex items-center justify-between p-4 bg-indigo-950 text-white z-50">
         <MachineBirthdayLogo colorized showText className="scale-75 origin-left" />
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 bg-white/10 rounded-xl"><Menu size={24} /></button>
       </div>
 
-      {/* BACKGROUND WATERMARK */}
       <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center transition-all duration-1000">
         {subscriberLogo ? (
           <div className="w-full h-full opacity-[0.03]" style={{ backgroundImage: `url("${subscriberLogo}")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'center', backgroundSize: 'clamp(250px, 40vw, 600px)' }} />
@@ -353,7 +347,30 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3 mb-4 md:mb-6"><div className="bg-emerald-500 w-2 h-6 md:w-3 md:h-8 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.3)]"></div><h2 className="text-xl md:text-2xl font-bold uppercase tracking-tighter text-slate-800 italic">Up To Date ({dashboardData.completed.length})</h2></div>
-        <div className="hidden md:block bg-white/60 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden opacity-95 mb-10"><table className="w-full text-left border-collapse"><thead className="bg-slate-50/50 text-[11px] font-bold uppercase tracking-widest text-slate-400 border-b"><tr><th className="p-6 text-left">Customer</th><th className="p-6 text-left">Machine</th><th className="p-6 text-center">Status</th><th className="p-6 text-right">Cycle</th></tr></thead><tbody className="divide-y divide-slate-50">{dashboardData.completed.map(item => (<tr key={item.id} className="hover:bg-slate-50/30 transition-colors group"><td className="p-6 font-bold text-slate-700 leading-tight"><SafeVal value={item.customer} /></td><td className="p-6 text-xs text-slate-500 font-bold uppercase tracking-widest"><SafeVal value={item.machine} /></td><td className="p-6 flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-emerald-600 tracking-widest"><CheckCircle size={14} className="text-emerald-500" /> {item.stage === "Newborn" ? "Growing" : "Sent"}</td><td className="p-6 text-[10px] font-black uppercase text-slate-300 tracking-widest text-right">{item.lifespanYears} Years</td></tr>))}</tbody></table></div>
+        <div className="hidden md:block bg-white/60 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden opacity-95 mb-10">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-50/50 text-[11px] font-bold uppercase tracking-widest text-slate-400 border-b"><tr><th className="p-6 text-left">Customer</th><th className="p-6 text-left">Machine</th><th className="p-6 text-center">Status</th><th className="p-6 text-right">Cycle</th></tr></thead>
+            <tbody className="divide-y divide-slate-50">
+              {dashboardData.completed.map(item => (
+                <tr key={item.id} className="hover:bg-slate-50/30 transition-colors group">
+                  <td className="p-6">
+                    <div className="flex items-center gap-3">
+                      <p className="font-bold text-slate-700 leading-tight"><SafeVal value={item.customer} /></p>
+                      {/* FIXED: Added Edit/Delete buttons to Up To Date section */}
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-1.5 transition-all"><Edit2 size={12}/></button>
+                        <button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-1.5 transition-all"><Trash2 size={12}/></button>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-6 text-xs text-slate-500 font-bold uppercase tracking-widest"><SafeVal value={item.machine} /></td>
+                  <td className="p-6 flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-emerald-600 tracking-widest"><CheckCircle size={14} className="text-emerald-500" /> {item.stage === "Newborn" ? "Growing" : "Sent"}</td>
+                  <td className="p-6 text-[10px] font-black uppercase text-slate-300 tracking-widest text-right">{item.lifespanYears} Years</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <footer className="mt-auto py-10 text-center border-t border-slate-200/50">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em]">Developed by SpearPoint Solutions</p>
@@ -413,7 +430,6 @@ export default function App() {
                 <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Purchase Date</label><input required type="date" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none font-black text-slate-700 text-sm uppercase" value={formData.purchaseDate} onChange={e => setFormData({...formData, purchaseDate: e.target.value})} /></div>
               </div>
 
-              {/* DYNAMIC LIFESPAN SELECTOR */}
               <div className="pt-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Engagement Lifecycle (Lifespan)</label>
                 <div className="grid grid-cols-3 gap-3">
@@ -423,7 +439,6 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                <p className="text-[9px] text-slate-400 mt-2 italic">* Shorter lifespans accelerate the "Human Age" math (Ideal for used vehicles).</p>
               </div>
 
               <button disabled={submitting} type="submit" className="w-full bg-indigo-600 text-white font-bold py-6 rounded-[2rem] shadow-2xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 transition-all uppercase tracking-widest text-lg mt-4">{submitting ? <Loader2 className="animate-spin" /> : 'Save to Database'}</button>
@@ -444,7 +459,6 @@ export default function App() {
         </div>
       )}
 
-      {/* DELETE CONFIRMATION */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-[100] p-4 font-sans text-center">
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-sm shadow-2xl border border-white/10 animate-in fade-in duration-200">
