@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Mail, Calendar, Settings, CheckCircle, Clock, Users, Plus, X, Download, MapPin, Edit2, Trash2, AlertTriangle, Loader2, Info, Building2, Menu, MessageSquare, Send, ChevronRight, FastForward, RotateCcw } from 'lucide-react';
+import { Mail, Calendar, Settings, CheckCircle, Clock, Users, Plus, X, Download, MapPin, Edit2, Trash2, AlertTriangle, Loader2, Info, Building2, Menu, MessageSquare, Send, ChevronRight, FastForward, RotateCcw, Zap } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query, setDoc } from 'firebase/firestore';
@@ -19,7 +19,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// FIX: Auto-healing appId for Preview vs Live consistency
+// Ensures a clean appId for consistent paths between Preview and Production
 const getAppId = () => {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -33,7 +33,7 @@ const getAppId = () => {
 
 const appId = getAppId();
 
-// --- BRAND LOGO COMPONENT ---
+// --- LOGO COMPONENT ---
 const MachineBirthdayLogo = ({ className, colorized = false, showText = false }) => (
   <div className={`flex items-center gap-3 ${className}`}>
     <svg viewBox="0 0 400 400" className={`${showText ? 'w-10 h-10' : 'w-full h-full'}`}>
@@ -53,7 +53,7 @@ const MachineBirthdayLogo = ({ className, colorized = false, showText = false })
   </div>
 );
 
-// --- HELPER FUNCTIONS ---
+// --- HELPER LOGIC ---
 const calculateMachineAge = (purchaseDate, lifespanYears, referenceDate = new Date()) => {
   if (!purchaseDate) return { humanEquivalentYears: 0, stage: "Newborn" };
   let purchase = purchaseDate && typeof purchaseDate.toDate === 'function' ? purchaseDate.toDate() : new Date(purchaseDate);
@@ -81,28 +81,22 @@ const SafeVal = ({ value }) => {
 };
 
 // --- CHATBOT DATA ---
-// Updated text to use JSX for mailto links
 const FAQ_DATA = {
   "initial": {
     text: "Hi! I'm your Machine Birthday assistant. How can I help you today?",
     options: [
       { label: "How does the 'Birthday' logic work?", next: "logic" },
-      { label: "How do I add a new machine?", next: "add" },
-      { label: "How do I export mailing labels?", next: "export" },
+      { label: "Can I shorten the 5-year cycle?", next: "shorten" },
       { label: "Can SpearPoint handle fulfillment?", next: "fulfillment" },
       { label: "I need technical support.", next: "contact" }
     ]
   },
   "logic": {
-    text: "We use 'Machine Dog Years'. Based on a typical 5-year lifespan, we calculate how old a machine is in human years. When they hit milestones (like 'Teen' or 'Veteran'), they appear in your Mail Queue!",
+    text: "We use 'Machine Dog Years'. Based on the equipment's lifespan, we calculate its 'human age'. When it hits milestones (like 'Teen' or 'Veteran'), it appears in your Mail Queue!",
     options: [{ label: "Back to main menu", next: "initial" }]
   },
-  "add": {
-    text: "Click the big indigo 'Add Machine' button in the header. Fill in the customer name, purchase date, and address. Once saved, the machine automatically begins its lifecycle tracking.",
-    options: [{ label: "Back to main menu", next: "initial" }]
-  },
-  "export": {
-    text: "When machines are due for a card, they appear in 'Requires Action'. Click 'Export Labels' to download a CSV file ready for your printer or mail house.",
+  "shorten": {
+    text: "Yes! When adding or editing a record, you can select a 3, 4, or 5-year lifespan. This is perfect for used vehicles or high-turnover assets that need more frequent engagement.",
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "fulfillment": {
@@ -117,7 +111,7 @@ const FAQ_DATA = {
   "contact": {
     text: (
       <span>
-        You can reach the SpearPoint Solutions team at <a href="mailto:support@SpearPointOnline.com" className="text-indigo-600 underline font-bold hover:text-indigo-800 transition-colors">support@SpearPointOnline.com</a> for technical support or for inquiries about creating a custom business strategy for your organization.
+        You can reach the SpearPoint Solutions team at <a href="mailto:support@SpearPointOnline.com" className="text-indigo-600 underline font-bold hover:text-indigo-800 transition-colors">support@SpearPointOnline.com</a> for technical support.
       </span>
     ),
     options: [{ label: "Back to main menu", next: "initial" }]
@@ -136,6 +130,8 @@ export default function App() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [subscriberLogo, setSubscriberLogo] = useState('');
+  
+  // Demo Mode State
   const [systemDate, setSystemDate] = useState(new Date());
   
   // Chatbot State
@@ -156,7 +152,7 @@ export default function App() {
         } else {
           await signInAnonymously(auth);
         }
-      } catch (err) { setStatusMsg("Auth error."); setLoading(false); }
+      } catch (err) { setStatusMsg("Connection error."); setLoading(false); }
     };
     initAuth();
     return onAuthStateChanged(auth, setUser);
@@ -168,7 +164,8 @@ export default function App() {
     const unsubMachines = onSnapshot(machinesRef, (snapshot) => {
       setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
-    });
+    }, (err) => { setStatusMsg("Permission Denied."); setLoading(false); });
+
     const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) setSubscriberLogo(docSnap.data().logoUrl || '');
@@ -210,21 +207,13 @@ export default function App() {
     setSubmitting(true);
     try {
       const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'machines');
-      const payload = { ...formData, lifespanYears: Number(formData.lifespanYears) || 5, updatedAt: new Date().toISOString() };
+      const payload = { ...formData, lifespanYears: Number(formData.lifespanYears), updatedAt: new Date().toISOString() };
       if (editingId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'machines', editingId), payload);
       else await addDoc(colRef, { ...payload, lastCardSent: null, createdAt: new Date().toISOString() });
       setShowModal(false); setEditingId(null);
       setFormData({ customer: '', contact: '', machine: '', purchaseDate: '', lifespanYears: 5, address: '', city: '', state: '', zip: '' });
     } catch (err) { alert("Save error."); } 
     finally { setSubmitting(false); }
-  };
-
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding'), { logoUrl: subscriberLogo }, { merge: true });
-      setShowSettings(false);
-    } catch (err) { alert("Save error."); }
   };
 
   const handleMarkSent = async (id, stage) => {
@@ -241,11 +230,11 @@ export default function App() {
   };
 
   const handleExportCSV = () => {
-    if (dashboardData.toSend.length === 0) return alert("No cards currently due for export.");
-    const headers = ["Customer", "Contact", "Address", "City", "State", "Zip", "Machine", "Stage", "Human Years"];
+    if (dashboardData.toSend.length === 0) return alert("Queue empty.");
+    const headers = ["Customer", "Contact", "Address", "City", "State", "Zip", "Machine", "Lifespan", "Stage", "Human Years"];
     const csvRows = [headers.join(",")];
     dashboardData.toSend.forEach(item => {
-      const row = [`"${item.customer || ''}"`, `"${item.contact || ''}"`, `"${item.address || ''}"`, `"${item.city || ''}"`, `"${item.state || ''}"`, `"${item.zip || ''}"`, `"${item.machine || ''}"`, `"${item.stage || ''}"`, `"${item.humanEquivalentYears || ''}"`];
+      const row = [`"${item.customer || ''}"`, `"${item.contact || ''}"`, `"${item.address || ''}"`, `"${item.city || ''}"`, `"${item.state || ''}"`, `"${item.zip || ''}"`, `"${item.machine || ''}"`, `"${item.lifespanYears || 5}"`, `"${item.stage || ''}"`, `"${item.humanEquivalentYears || ''}"`];
       csvRows.push(row.join(","));
     });
     const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
@@ -259,16 +248,17 @@ export default function App() {
     <>
       <div className="mb-12 hidden md:block"><MachineBirthdayLogo colorized showText /></div>
       <nav className="flex-1 space-y-3">
-        <button className="w-full flex items-center gap-3 bg-indigo-800/60 p-4 rounded-2xl font-bold transition-all shadow-lg border border-white/5 uppercase tracking-widest text-[10px] text-white"><Mail size={18}/> Mail Queue</button>
+        <button className="w-full flex items-center gap-3 bg-indigo-800/60 p-4 rounded-2xl font-bold shadow-lg border border-white/5 uppercase tracking-widest text-[10px] text-white"><Mail size={18}/> Mail Queue</button>
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Users size={18}/> Customers</div><span>Soon</span></div>
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Calendar size={18}/> Calendar</div><span>Soon</span></div>
       </nav>
 
+      {/* DEMO CONTROLS (REMOVE FOR PRODUCTION) */}
       <div className="bg-indigo-900/40 p-5 rounded-3xl border border-white/5 mb-6">
         <p className="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-3 flex items-center gap-2"><FastForward size={12}/> Demo Controls</p>
         <div className="space-y-2">
-          <button onClick={() => advanceTime(1)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase tracking-tighter text-indigo-200 transition-all text-left flex justify-between items-center">Advance 1 Month <ChevronRight size={12}/></button>
-          <button onClick={() => advanceTime(6)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase tracking-tighter text-indigo-200 transition-all text-left flex justify-between items-center">Advance 6 Months <ChevronRight size={12}/></button>
+          <button onClick={() => advanceTime(1)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase text-indigo-200 transition-all text-left flex justify-between items-center">Advance 1 Month <ChevronRight size={12}/></button>
+          <button onClick={() => advanceTime(6)} className="w-full bg-white/5 hover:bg-white/10 p-3 rounded-xl text-[10px] font-bold uppercase text-indigo-200 transition-all text-left flex justify-between items-center">Advance 6 Months <ChevronRight size={12}/></button>
           <button onClick={() => setSystemDate(new Date())} className="w-full text-[9px] font-black uppercase text-indigo-400/60 mt-2 flex items-center justify-center gap-2 hover:text-indigo-400 transition-colors"><RotateCcw size={10}/> Reset Time</button>
         </div>
       </div>
@@ -318,7 +308,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content */}
       <div className="flex-1 p-4 md:p-10 overflow-auto z-10 relative pb-24 md:pb-10 flex flex-col min-h-screen">
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
           <div>
@@ -347,7 +336,13 @@ export default function App() {
                 dashboardData.toSend.map(item => (
                   <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
                     <td className="p-6"><div className="flex items-center gap-3 mb-1"><p className="font-bold text-slate-900 text-lg leading-none truncate max-w-[250px]"><SafeVal value={item.customer} /></p><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-2 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Edit2 size={14}/></button><button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-2 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Trash2 size={14}/></button></div></div><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><MapPin size={10} className="text-indigo-400" /> <SafeVal value={item.address} />, <SafeVal value={item.city} /> <SafeVal value={item.state} /></p></td>
-                    <td className="p-6"><p className="font-bold text-slate-700 text-sm tracking-tight italic leading-none mb-1"><SafeVal value={item.machine} /></p><p className="text-[10px] text-slate-400 font-bold uppercase">Purchased: <SafeVal value={item.purchaseDate} /></p></td>
+                    <td className="p-6">
+                        <p className="font-bold text-slate-700 text-sm tracking-tight italic leading-none mb-1"><SafeVal value={item.machine} /></p>
+                        <div className="flex items-center gap-2">
+                           <p className="text-[10px] text-slate-400 font-bold uppercase italic"><SafeVal value={item.purchaseDate} /></p>
+                           <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded font-black text-slate-500 uppercase">{item.lifespanYears}YR CYCLE</span>
+                        </div>
+                    </td>
                     <td className="p-6 text-center"><span className="px-4 py-1.5 bg-pink-100 text-pink-700 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm"><SafeVal value={item.stage} /></span></td>
                     <td className="p-6 text-right"><button onClick={() => handleMarkSent(item.id, item.stage)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-lg hover:bg-indigo-700 active:translate-y-0.5 transition-all">Mark Sent</button></td>
                   </tr>
@@ -357,26 +352,15 @@ export default function App() {
           </table>
         </div>
 
-        <div className="md:hidden space-y-4 mb-12">
-          {dashboardData.toSend.map(item => (
-            <div key={item.id} className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100">
-              <div className="flex justify-between items-start mb-4"><div><h3 className="font-black text-xl text-slate-900 leading-none mb-1"><SafeVal value={item.customer} /></h3><p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1"><MapPin size={10}/> {item.city}, {item.state}</p></div><div className="flex gap-2"><button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="p-2 bg-slate-50 rounded-xl text-slate-400"><Edit2 size={16}/></button><button onClick={() => setDeleteConfirmId(item.id)} className="p-2 bg-slate-50 rounded-xl text-red-300"><Trash2 size={16}/></button></div></div>
-              <div className="bg-slate-50 p-4 rounded-2xl mb-4 flex justify-between items-center"><div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Machine</p><p className="font-bold text-slate-700">{item.machine}</p></div><div className="text-right"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stage</p><p className="font-black text-pink-500 uppercase text-xs tracking-tighter">{item.stage}</p></div></div>
-              <button onClick={() => handleMarkSent(item.id, item.stage)} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-100">Mark Sent</button>
-            </div>
-          ))}
-        </div>
-
         <div className="flex items-center gap-3 mb-4 md:mb-6"><div className="bg-emerald-500 w-2 h-6 md:w-3 md:h-8 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.3)]"></div><h2 className="text-xl md:text-2xl font-bold uppercase tracking-tighter text-slate-800 italic">Up To Date ({dashboardData.completed.length})</h2></div>
-        <div className="hidden md:block bg-white/60 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden opacity-95 mb-10"><table className="w-full text-left border-collapse"><thead className="bg-slate-50/50 text-[11px] font-bold uppercase tracking-widest text-slate-400 border-b"><tr><th className="p-6 text-left">Customer</th><th className="p-6 text-left">Machine</th><th className="p-6 text-center">Status</th><th className="p-6 text-right">Next Stage</th></tr></thead><tbody className="divide-y divide-slate-50">{dashboardData.completed.map(item => (<tr key={item.id} className="hover:bg-slate-50/30 transition-colors group"><td className="p-6"><div className="flex items-center gap-3"><p className="font-bold text-slate-700 leading-tight"><SafeVal value={item.customer} /></p><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-1.5 transition-all"><Edit2 size={12}/></button><button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-1.5 transition-all"><Trash2 size={12}/></button></div></div></td><td className="p-6 text-xs text-slate-500 font-bold uppercase tracking-widest"><SafeVal value={item.machine} /></td><td className="p-6 flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-emerald-600 tracking-widest"><CheckCircle size={14} className="text-emerald-500" /> {item.stage === "Newborn" ? "Growing Up" : "Card Sent"}</td><td className="p-6 text-[10px] font-bold uppercase text-slate-300 tracking-widest leading-tight text-right uppercase">{item.stage === "Newborn" ? "Toddler (Age 2)" : "Next Milestone"}</td></tr>))}</tbody></table></div>
-        <div className="md:hidden space-y-3 pb-10">{dashboardData.completed.map(item => (<div key={item.id} className="bg-white/70 p-5 rounded-3xl border border-slate-100 flex justify-between items-center"><div><p className="font-bold text-slate-700 text-sm">{item.customer}</p><p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.1em]">{item.machine}</p></div><div className="flex items-center gap-2 text-[9px] font-black uppercase text-emerald-500 bg-emerald-50 px-3 py-1.5 rounded-full"><CheckCircle size={10}/> {item.stage === "Newborn" ? "New" : "Sent"}</div></div>))}</div>
+        <div className="hidden md:block bg-white/60 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden opacity-95 mb-10"><table className="w-full text-left border-collapse"><thead className="bg-slate-50/50 text-[11px] font-bold uppercase tracking-widest text-slate-400 border-b"><tr><th className="p-6 text-left">Customer</th><th className="p-6 text-left">Machine</th><th className="p-6 text-center">Status</th><th className="p-6 text-right">Cycle</th></tr></thead><tbody className="divide-y divide-slate-50">{dashboardData.completed.map(item => (<tr key={item.id} className="hover:bg-slate-50/30 transition-colors group"><td className="p-6 font-bold text-slate-700 leading-tight"><SafeVal value={item.customer} /></td><td className="p-6 text-xs text-slate-500 font-bold uppercase tracking-widest"><SafeVal value={item.machine} /></td><td className="p-6 flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-emerald-600 tracking-widest"><CheckCircle size={14} className="text-emerald-500" /> {item.stage === "Newborn" ? "Growing" : "Sent"}</td><td className="p-6 text-[10px] font-black uppercase text-slate-300 tracking-widest text-right">{item.lifespanYears} Years</td></tr>))}</tbody></table></div>
 
         <footer className="mt-auto py-10 text-center border-t border-slate-200/50">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em]">Developed by SpearPoint Solutions</p>
         </footer>
       </div>
 
-      {/* CHATBOT WIDGET (UPDATED: Added live mailto links) */}
+      {/* CHATBOT ASSISTANT */}
       <div className={`fixed bottom-6 right-6 z-[200] flex flex-col items-end transition-all duration-300 ${chatOpen ? 'w-[320px] md:w-[380px]' : 'w-14'}`}>
         {chatOpen && (
           <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 w-full mb-4 flex flex-col max-h-[450px] animate-in slide-in-from-bottom-5 overflow-hidden">
@@ -387,9 +371,7 @@ export default function App() {
             <div className="flex-1 overflow-auto p-6 space-y-4">
               {chatHistory.map((msg, i) => (
                 <div key={i} className={`flex flex-col ${msg.type === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${msg.type === 'user' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-50 text-slate-600 font-medium'}`}>
-                    {msg.text}
-                  </div>
+                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${msg.type === 'user' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-50 text-slate-600 font-medium'}`}>{msg.text}</div>
                   {msg.options && !chatHistory[i+1] && (
                     <div className="mt-3 flex flex-col gap-2 w-full">
                       {msg.options.map((opt, oi) => (
@@ -410,7 +392,7 @@ export default function App() {
         </button>
       </div>
 
-      {/* MODALS */}
+      {/* MODAL: ADD / EDIT MACHINE */}
       {showModal && (
         <div className="fixed inset-0 bg-indigo-950 md:bg-indigo-950/80 backdrop-blur-xl flex items-center justify-center z-[100] p-0 md:p-4 font-sans overflow-auto">
           <div className="bg-white md:rounded-[2.5rem] shadow-2xl w-full max-w-xl min-h-screen md:min-h-0 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -430,6 +412,20 @@ export default function App() {
                 <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Model Name</label><input required className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none font-black text-slate-700 text-sm" value={formData.machine} onChange={e => setFormData({...formData, machine: e.target.value})} /></div>
                 <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Purchase Date</label><input required type="date" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none font-black text-slate-700 text-sm uppercase" value={formData.purchaseDate} onChange={e => setFormData({...formData, purchaseDate: e.target.value})} /></div>
               </div>
+
+              {/* DYNAMIC LIFESPAN SELECTOR */}
+              <div className="pt-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Engagement Lifecycle (Lifespan)</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[3, 4, 5].map(years => (
+                    <button key={years} type="button" onClick={() => setFormData({...formData, lifespanYears: years})} className={`py-4 rounded-2xl font-black text-xs transition-all border-2 ${formData.lifespanYears === years ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-indigo-200'}`}>
+                      {years} YEARS {years < 5 && <Zap size={10} className="inline ml-1" />}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[9px] text-slate-400 mt-2 italic">* Shorter lifespans accelerate the "Human Age" math (Ideal for used vehicles).</p>
+              </div>
+
               <button disabled={submitting} type="submit" className="w-full bg-indigo-600 text-white font-bold py-6 rounded-[2rem] shadow-2xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 transition-all uppercase tracking-widest text-lg mt-4">{submitting ? <Loader2 className="animate-spin" /> : 'Save to Database'}</button>
             </form>
           </div>
@@ -441,14 +437,14 @@ export default function App() {
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 animate-in zoom-in-95 duration-200">
             <div className="p-6 md:p-10 border-b flex justify-between items-center bg-slate-50/50"><h3 className="font-bold text-xl text-slate-950 tracking-tighter uppercase italic flex items-center gap-3"><Building2 className="text-indigo-600" /> Branding</h3><button onClick={() => setShowSettings(false)} className="bg-slate-200 text-slate-600 p-2 rounded-full hover:bg-slate-300 transition-colors"><X size={24}/></button></div>
             <form onSubmit={handleSaveSettings} className="p-6 md:p-10 space-y-6">
-              <div className="space-y-2"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Subscriber Logo URL</label><input placeholder="https://example.com/logo.png" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none font-black text-slate-700 text-sm" value={subscriberLogo} onChange={e => setSubscriberLogo(e.target.value)} /><p className="text-[10px] text-slate-400 mt-2 italic leading-relaxed">Changes apply to background watermark.</p></div>
+              <div className="space-y-2"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Subscriber Logo URL</label><input placeholder="https://example.com/logo.png" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none font-black text-slate-700 text-sm" value={subscriberLogo} onChange={e => setSubscriberLogo(e.target.value)} /></div>
               <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl hover:bg-indigo-700 uppercase tracking-widest text-sm">Apply Branding</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation */}
+      {/* DELETE CONFIRMATION */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-[100] p-4 font-sans text-center">
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-sm shadow-2xl border border-white/10 animate-in fade-in duration-200">
