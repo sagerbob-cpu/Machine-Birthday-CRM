@@ -5,6 +5,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query, setDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
+// IMPORTANT: RE-PASTE YOUR ACTUAL API KEYS HERE
 const firebaseConfig = {
   apiKey: "AIzaSyCYUHfKcsOZDu8nBwRbtUyEYTsVZns052I",
   authDomain: "machine-birthday-crm.firebaseapp.com",
@@ -57,9 +58,11 @@ const calculateMachineAge = (purchaseDate, lifespanYears, referenceDate = new Da
   if (!purchaseDate) return { humanEquivalentYears: 0, stage: "Newborn" };
   let purchase = purchaseDate && typeof purchaseDate.toDate === 'function' ? purchaseDate.toDate() : new Date(purchaseDate);
   if (isNaN(purchase.getTime())) return { humanEquivalentYears: 0, stage: "Newborn" };
+  
   const monthsPassed = (referenceDate.getFullYear() - purchase.getFullYear()) * 12 + (referenceDate.getMonth() - purchase.getMonth());
   const totalLifespanMonths = (Number(lifespanYears) || 5) * 12;
   const humanEquivalentYears = Math.round((monthsPassed / totalLifespanMonths) * 80);
+  
   let stage = "Newborn";
   if (humanEquivalentYears >= 74) stage = "Retiring";
   else if (humanEquivalentYears >= 64) stage = "Golden Years";
@@ -77,6 +80,7 @@ const SafeVal = ({ value }) => {
   return <span>{String(value)}</span>;
 };
 
+// --- CHATBOT DATA ---
 const FAQ_DATA = {
   "initial": {
     text: "Hi! I'm your Machine Birthday assistant. How can I help you today?",
@@ -203,16 +207,8 @@ export default function App() {
       else await addDoc(colRef, { ...payload, lastCardSent: null, createdAt: new Date().toISOString() });
       setShowModal(false); setEditingId(null);
       setFormData({ customer: '', contact: '', machine: '', purchaseDate: '', lifespanYears: 5, address: '', city: '', state: '', zip: '' });
-    } catch (err) { alert("Save error."); } 
+    } catch (err) { console.error(err); } 
     finally { setSubmitting(false); }
-  };
-
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding'), { logoUrl: subscriberLogo }, { merge: true });
-      setShowSettings(false);
-    } catch (err) { alert("Save error."); }
   };
 
   const handleMarkSent = async (id, stage) => {
@@ -252,7 +248,7 @@ export default function App() {
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Calendar size={18}/> Calendar</div><span>Soon</span></div>
       </nav>
 
-      {/* NEW: FULFILLMENT REQUEST CALL TO ACTION */}
+      {/* FULFILLMENT REQUEST CALL TO ACTION */}
       <div className="mt-4 mb-8">
         <a href="mailto:support@SpearPointOnline.com?subject=Done For You Fulfillment Inquiry" 
            className="w-full group relative flex flex-col gap-2 p-4 bg-gradient-to-br from-pink-600 to-rose-500 rounded-2xl border border-white/20 shadow-xl hover:scale-[1.02] active:scale-95 transition-all overflow-hidden">
@@ -312,9 +308,9 @@ export default function App() {
         </div>
       )}
       <div className="flex-1 p-4 md:p-10 overflow-auto z-10 relative pb-24 md:pb-10 flex flex-col min-h-screen">
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6 text-white md:text-slate-900">
           <div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 uppercase italic leading-none">Mail Queue</h1>
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-none text-slate-900">Mail Queue</h1>
             <div className="flex flex-wrap items-center gap-3 mt-3">
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-r border-slate-300 pr-3">Fleet Size: {machines.length}</p>
               <p className="text-[10px] font-black uppercase text-indigo-500 flex items-center gap-1"><Clock size={12}/> Date: {systemDate.toLocaleDateString()}</p>
@@ -425,7 +421,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <button disabled={submitting} type="submit" className="w-full bg-indigo-600 text-white font-bold py-6 rounded-[2rem] shadow-2xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 transition-all uppercase tracking-widest text-lg mt-4">{submitting ? <Loader2 className="animate-spin" /> : 'Save to Database'}</button>
+              <button disabled={submitting} type="submit" className="w-full bg-indigo-600 text-white font-black py-6 rounded-[2rem] shadow-2xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 transition-all uppercase tracking-widest text-lg mt-4">{submitting ? <Loader2 className="animate-spin" /> : 'Save to Database'}</button>
             </form>
           </div>
         </div>
