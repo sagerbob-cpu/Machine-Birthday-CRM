@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Mail, Calendar, Settings, CheckCircle, Clock, Users, Plus, X, Download, MapPin, Edit2, Trash2, AlertTriangle, Loader2, Info, Building2, Menu, MessageSquare, Send, ChevronRight, FastForward, RotateCcw, Zap } from 'lucide-react';
+import { Mail, Calendar, Settings, CheckCircle, Clock, Users, Plus, X, Download, MapPin, Edit2, Trash2, AlertTriangle, Loader2, Info, Building2, Menu, MessageSquare, Send, ChevronRight, FastForward, RotateCcw, Zap, Sparkles } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query, setDoc } from 'firebase/firestore';
@@ -57,11 +57,9 @@ const calculateMachineAge = (purchaseDate, lifespanYears, referenceDate = new Da
   if (!purchaseDate) return { humanEquivalentYears: 0, stage: "Newborn" };
   let purchase = purchaseDate && typeof purchaseDate.toDate === 'function' ? purchaseDate.toDate() : new Date(purchaseDate);
   if (isNaN(purchase.getTime())) return { humanEquivalentYears: 0, stage: "Newborn" };
-  
   const monthsPassed = (referenceDate.getFullYear() - purchase.getFullYear()) * 12 + (referenceDate.getMonth() - purchase.getMonth());
   const totalLifespanMonths = (Number(lifespanYears) || 5) * 12;
   const humanEquivalentYears = Math.round((monthsPassed / totalLifespanMonths) * 80);
-  
   let stage = "Newborn";
   if (humanEquivalentYears >= 74) stage = "Retiring";
   else if (humanEquivalentYears >= 64) stage = "Golden Years";
@@ -79,7 +77,6 @@ const SafeVal = ({ value }) => {
   return <span>{String(value)}</span>;
 };
 
-// --- CHATBOT DATA ---
 const FAQ_DATA = {
   "initial": {
     text: "Hi! I'm your Machine Birthday assistant. How can I help you today?",
@@ -95,7 +92,7 @@ const FAQ_DATA = {
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "shorten": {
-    text: "Yes! When adding or editing a record, you can select a 3, 4, or 5-year lifespan. This is perfect for used vehicles or high-turnover assets that need more frequent engagement.",
+    text: "Yes! When adding or editing a record, you can select a 3, 4, or 5-year lifespan. This is perfect for used vehicles or high-turnover assets.",
     options: [{ label: "Back to main menu", next: "initial" }]
   },
   "fulfillment": {
@@ -129,9 +126,7 @@ export default function App() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [subscriberLogo, setSubscriberLogo] = useState('');
-  
   const [systemDate, setSystemDate] = useState(new Date());
-  
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([FAQ_DATA.initial]);
   const chatEndRef = useRef(null);
@@ -162,7 +157,6 @@ export default function App() {
       setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, (err) => { setStatusMsg("Permission Denied."); setLoading(false); });
-
     const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) setSubscriberLogo(docSnap.data().logoUrl || '');
@@ -213,6 +207,14 @@ export default function App() {
     finally { setSubmitting(false); }
   };
 
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'branding'), { logoUrl: subscriberLogo }, { merge: true });
+      setShowSettings(false);
+    } catch (err) { alert("Save error."); }
+  };
+
   const handleMarkSent = async (id, stage) => {
     try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'machines', id), { lastCardSent: stage }); }
     catch (err) { console.error(err); }
@@ -250,6 +252,18 @@ export default function App() {
         <div className="flex items-center justify-between p-4 opacity-30 text-[10px] font-bold uppercase tracking-widest text-white"><div className="flex items-center gap-3"><Calendar size={18}/> Calendar</div><span>Soon</span></div>
       </nav>
 
+      {/* NEW: FULFILLMENT REQUEST CALL TO ACTION */}
+      <div className="mt-4 mb-8">
+        <a href="mailto:support@SpearPointOnline.com?subject=Done For You Fulfillment Inquiry" 
+           className="w-full group relative flex flex-col gap-2 p-4 bg-gradient-to-br from-pink-600 to-rose-500 rounded-2xl border border-white/20 shadow-xl hover:scale-[1.02] active:scale-95 transition-all overflow-hidden">
+          <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:rotate-12 transition-transform"><Sparkles size={32}/></div>
+          <div className="flex items-center gap-2 text-white font-black uppercase italic tracking-tighter text-xs">
+            <Zap size={14} className="fill-white"/> Done For You
+          </div>
+          <p className="text-[9px] text-pink-100 font-bold uppercase tracking-widest leading-tight">Request Fulfillment Quote</p>
+        </a>
+      </div>
+
       <div className="bg-indigo-900/40 p-5 rounded-3xl border border-white/5 mb-6">
         <p className="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-3 flex items-center gap-2"><FastForward size={12}/> Demo Controls</p>
         <div className="space-y-2">
@@ -279,12 +293,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900 selection:bg-indigo-100 relative overflow-hidden">
-      
       <div className="md:hidden flex items-center justify-between p-4 bg-indigo-950 text-white z-50">
         <MachineBirthdayLogo colorized showText className="scale-75 origin-left" />
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 bg-white/10 rounded-xl"><Menu size={24} /></button>
       </div>
-
       <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center transition-all duration-1000">
         {subscriberLogo ? (
           <div className="w-full h-full opacity-[0.03]" style={{ backgroundImage: `url("${subscriberLogo}")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'center', backgroundSize: 'clamp(250px, 40vw, 600px)' }} />
@@ -292,16 +304,13 @@ export default function App() {
           <div className="opacity-[0.03] grayscale brightness-50"><MachineBirthdayLogo className="w-[300px] h-[300px] md:w-[500px] md:h-[500px]" /></div>
         )}
       </div>
-
       <div className="hidden md:flex w-64 bg-indigo-950 text-white p-6 flex flex-col shadow-2xl z-20"><SidebarContent /></div>
-
       {mobileMenuOpen && (
         <div className="fixed inset-0 bg-indigo-950 z-[60] p-6 flex flex-col animate-in fade-in slide-in-from-left duration-200">
           <div className="flex justify-between items-center mb-8"><MachineBirthdayLogo colorized showText /><button onClick={() => setMobileMenuOpen(false)} className="text-white"><X size={32}/></button></div>
           <SidebarContent />
         </div>
       )}
-
       <div className="flex-1 p-4 md:p-10 overflow-auto z-10 relative pb-24 md:pb-10 flex flex-col min-h-screen">
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
           <div>
@@ -319,9 +328,7 @@ export default function App() {
             <button onClick={() => { setEditingId(null); setFormData({customer:'', contact:'', machine:'', purchaseDate:'', lifespanYears:5, address:'', city:'', state:'', zip:''}); setShowModal(true); }} className="flex-1 lg:flex-none bg-indigo-600 text-white px-6 py-4 md:py-3 rounded-2xl font-black shadow-xl hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] md:text-xs"><Plus size={18} /> Add Machine</button>
           </div>
         </header>
-
         <div className="flex items-center gap-3 mb-4 md:mb-6"><div className="bg-pink-500 w-2 h-6 md:w-3 md:h-8 rounded-full shadow-[0_0_12px_rgba(236,72,153,0.3)]"></div><h2 className="text-xl md:text-2xl font-bold uppercase tracking-tighter italic">Requires Action ({dashboardData.toSend.length})</h2></div>
-        
         <div className="hidden md:block bg-white/80 backdrop-blur-sm rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden mb-12">
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/50 text-[11px] font-bold uppercase tracking-widest text-slate-400 border-b"><tr><th className="p-6">Customer / Address</th><th className="p-6">Machine Details</th><th className="p-6 text-center">Life Stage</th><th className="p-6 text-right">Action</th></tr></thead>
@@ -330,13 +337,7 @@ export default function App() {
                 dashboardData.toSend.map(item => (
                   <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
                     <td className="p-6"><div className="flex items-center gap-3 mb-1"><p className="font-bold text-slate-900 text-lg leading-none truncate max-w-[250px]"><SafeVal value={item.customer} /></p><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-2 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Edit2 size={14}/></button><button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-2 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Trash2 size={14}/></button></div></div><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><MapPin size={10} className="text-indigo-400" /> <SafeVal value={item.address} />, <SafeVal value={item.city} /> <SafeVal value={item.state} /></p></td>
-                    <td className="p-6">
-                        <p className="font-bold text-slate-700 text-sm tracking-tight italic leading-none mb-1"><SafeVal value={item.machine} /></p>
-                        <div className="flex items-center gap-2">
-                           <p className="text-[10px] text-slate-400 font-bold uppercase italic"><SafeVal value={item.purchaseDate} /></p>
-                           <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded font-black text-slate-500 uppercase">{item.lifespanYears}YR CYCLE</span>
-                        </div>
-                    </td>
+                    <td className="p-6"><p className="font-bold text-slate-700 text-sm tracking-tight italic leading-none mb-1"><SafeVal value={item.machine} /></p><div className="flex items-center gap-2"><p className="text-[10px] text-slate-400 font-bold uppercase italic"><SafeVal value={item.purchaseDate} /></p><span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded font-black text-slate-500 uppercase">{item.lifespanYears}YR CYCLE</span></div></td>
                     <td className="p-6 text-center"><span className="px-4 py-1.5 bg-pink-100 text-pink-700 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm"><SafeVal value={item.stage} /></span></td>
                     <td className="p-6 text-right"><button onClick={() => handleMarkSent(item.id, item.stage)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-lg hover:bg-indigo-700 active:translate-y-0.5 transition-all">Mark Sent</button></td>
                   </tr>
@@ -345,7 +346,6 @@ export default function App() {
             </tbody>
           </table>
         </div>
-
         <div className="flex items-center gap-3 mb-4 md:mb-6"><div className="bg-emerald-500 w-2 h-6 md:w-3 md:h-8 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.3)]"></div><h2 className="text-xl md:text-2xl font-bold uppercase tracking-tighter text-slate-800 italic">Up To Date ({dashboardData.completed.length})</h2></div>
         <div className="hidden md:block bg-white/60 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden opacity-95 mb-10">
           <table className="w-full text-left border-collapse">
@@ -353,16 +353,7 @@ export default function App() {
             <tbody className="divide-y divide-slate-50">
               {dashboardData.completed.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50/30 transition-colors group">
-                  <td className="p-6">
-                    <div className="flex items-center gap-3">
-                      <p className="font-bold text-slate-700 leading-tight"><SafeVal value={item.customer} /></p>
-                      {/* FIXED: Added Edit/Delete buttons to Up To Date section */}
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-1.5 transition-all"><Edit2 size={12}/></button>
-                        <button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-1.5 transition-all"><Trash2 size={12}/></button>
-                      </div>
-                    </div>
-                  </td>
+                  <td className="p-6"><div className="flex items-center gap-3"><p className="font-bold text-slate-700 leading-tight"><SafeVal value={item.customer} /></p><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setEditingId(item.id); setFormData(item); setShowModal(true); }} className="text-slate-300 hover:text-indigo-600 p-1.5 transition-all"><Edit2 size={12}/></button><button onClick={() => setDeleteConfirmId(item.id)} className="text-slate-300 hover:text-red-500 p-1.5 transition-all"><Trash2 size={12}/></button></div></div></td>
                   <td className="p-6 text-xs text-slate-500 font-bold uppercase tracking-widest"><SafeVal value={item.machine} /></td>
                   <td className="p-6 flex items-center gap-2 justify-center text-[10px] font-bold uppercase text-emerald-600 tracking-widest"><CheckCircle size={14} className="text-emerald-500" /> {item.stage === "Newborn" ? "Growing" : "Sent"}</td>
                   <td className="p-6 text-[10px] font-black uppercase text-slate-300 tracking-widest text-right">{item.lifespanYears} Years</td>
@@ -371,13 +362,10 @@ export default function App() {
             </tbody>
           </table>
         </div>
-
         <footer className="mt-auto py-10 text-center border-t border-slate-200/50">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em]">Developed by SpearPoint Solutions</p>
         </footer>
       </div>
-
-      {/* CHATBOT ASSISTANT */}
       <div className={`fixed bottom-6 right-6 z-[200] flex flex-col items-end transition-all duration-300 ${chatOpen ? 'w-[320px] md:w-[380px]' : 'w-14'}`}>
         {chatOpen && (
           <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 w-full mb-4 flex flex-col max-h-[450px] animate-in slide-in-from-bottom-5 overflow-hidden">
@@ -408,8 +396,6 @@ export default function App() {
           {chatOpen ? <X size={24}/> : <MessageSquare size={24}/>}
         </button>
       </div>
-
-      {/* MODAL: ADD / EDIT MACHINE */}
       {showModal && (
         <div className="fixed inset-0 bg-indigo-950 md:bg-indigo-950/80 backdrop-blur-xl flex items-center justify-center z-[100] p-0 md:p-4 font-sans overflow-auto">
           <div className="bg-white md:rounded-[2.5rem] shadow-2xl w-full max-w-xl min-h-screen md:min-h-0 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -429,7 +415,6 @@ export default function App() {
                 <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Model Name</label><input required className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none font-black text-slate-700 text-sm" value={formData.machine} onChange={e => setFormData({...formData, machine: e.target.value})} /></div>
                 <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Purchase Date</label><input required type="date" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:border-indigo-500 outline-none font-black text-slate-700 text-sm uppercase" value={formData.purchaseDate} onChange={e => setFormData({...formData, purchaseDate: e.target.value})} /></div>
               </div>
-
               <div className="pt-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Engagement Lifecycle (Lifespan)</label>
                 <div className="grid grid-cols-3 gap-3">
@@ -440,13 +425,11 @@ export default function App() {
                   ))}
                 </div>
               </div>
-
               <button disabled={submitting} type="submit" className="w-full bg-indigo-600 text-white font-bold py-6 rounded-[2rem] shadow-2xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 transition-all uppercase tracking-widest text-lg mt-4">{submitting ? <Loader2 className="animate-spin" /> : 'Save to Database'}</button>
             </form>
           </div>
         </div>
       )}
-
       {showSettings && (
         <div className="fixed inset-0 bg-indigo-950/80 backdrop-blur-xl flex items-center justify-center z-[100] p-4 font-sans">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 animate-in zoom-in-95 duration-200">
@@ -458,7 +441,6 @@ export default function App() {
           </div>
         </div>
       )}
-
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-[100] p-4 font-sans text-center">
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-sm shadow-2xl border border-white/10 animate-in fade-in duration-200">
